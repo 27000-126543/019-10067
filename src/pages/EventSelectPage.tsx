@@ -1,9 +1,41 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowLeft, BookOpen, RefreshCw } from 'lucide-react';
 import EventCard from '@/components/common/EventCard';
 import { events } from '@/data';
+import type { StudentProgress } from '@/types';
 
 export default function EventSelectPage() {
+  const [allProgress, setAllProgress] = useState<Record<string, StudentProgress>>({});
+
+  const loadAllProgress = () => {
+    const result: Record<string, StudentProgress> = {};
+    for (const event of events) {
+      const saved = localStorage.getItem(`progress_${event.id}`);
+      if (saved) {
+        try {
+          result[event.id] = JSON.parse(saved);
+        } catch (e) {
+          // ignore parse errors
+        }
+      }
+    }
+    setAllProgress(result);
+  };
+
+  useEffect(() => {
+    loadAllProgress();
+  }, []);
+
+  const handleResetAll = () => {
+    if (confirm('确定要清除所有事件的演练进度吗？此操作不可恢复。')) {
+      for (const event of events) {
+        localStorage.removeItem(`progress_${event.id}`);
+      }
+      loadAllProgress();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-paper">
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
@@ -20,7 +52,13 @@ export default function EventSelectPage() {
               <BookOpen className="w-5 h-5 text-primary-700" />
               <span className="font-semibold text-ink">学生端 · 选择事件</span>
             </div>
-            <div className="w-20"></div>
+            <button
+              onClick={handleResetAll}
+              className="flex items-center gap-1.5 text-sm text-primary-500 hover:text-accent-600 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>清除进度</span>
+            </button>
           </div>
         </div>
       </header>
@@ -37,7 +75,7 @@ export default function EventSelectPage() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((event) => (
-            <EventCard key={event.id} event={event} />
+            <EventCard key={event.id} event={event} progress={allProgress[event.id]} />
           ))}
         </div>
 

@@ -1,15 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   DndContext,
-  closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   DragEndEvent,
-  DragOverEvent,
   DragStartEvent,
+  pointerWithin,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -36,6 +35,10 @@ export default function TimelinePage() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [correctPositions, setCorrectPositions] = useState<boolean[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  const timelineDropRef = useRef<HTMLDivElement>(null);
+  const availableDropRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -55,23 +58,33 @@ export default function TimelinePage() {
   }, [eventId, setCurrentEvent]);
 
   useEffect(() => {
-    if (event && progress) {
+    if (event && progress && !initialized) {
       if (progress.timelineOrder.length > 0) {
         setTimelineOrderState(progress.timelineOrder);
         const remaining = event.nodes
           .map((n) => n.id)
           .filter((id) => !progress.timelineOrder.includes(id));
         setAvailableCards(remaining);
+        if (progress.timelineScore > 0 && progress.timelineOrder.length === event.nodes.length) {
+          const result = validateTimelineOrder(progress.timelineOrder, event.correctOrder);
+          setCorrectPositions(result.correctPositions);
+          setShowFeedback(true);
+        }
       } else {
         const shuffled = [...event.nodes].sort(() => Math.random() - 0.5);
         setAvailableCards(shuffled.map((n) => n.id));
         setTimelineOrderState([]);
       }
+      setInitialized(true);
     }
-  }, [event, progress]);
+  }, [event, progress, initialized]);
 
   if (!event) {
     return <div className="p-8 text-center">事件不存在</div>;
+  }
+
+  if (!progress) {
+    return <div className="p-8 text-center text-primary-500">加载中...</div>;
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -82,56 +95,69 @@ export default function TimelinePage() {
     const { active, over } = event;
     setActiveId(null);
 
-    if (!over) return;
+    const activeIdStr = active.id as string;
+    const activeInTimeline = timelineOrder.includes(activeIdStr);
+    const activeInAvailable = availableCards.includes(activeIdStr);
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+    const overId = over?.id as string | undefined;
 
-    const activeInTimeline = timelineOrder.includes(activeId);
-    const overInTimeline = timelineOrder.includes(overId);
+    const getElementDropZone = () => {
+      if (!over) return null;
+      const activator = event.activatorEvent as PointerEvent | undefined;
+      if (!activator) return null;
+      const el = document.elementFromPoint(activator.clientX, activator.clientY);
+      if (!el) return null;
+      if (el.closest('[data-dropzone="timeline"]')) return 'timeline';
+      if (el.closest('[data-dropzone="available"]')) return 'available';
+      return null;
+    };
 
-    if (activeInTimeline && overInTimeline) {
-      const oldIndex = timelineOrder.indexOf(activeId);
-      const newIndex = timelineOrder.indexOf(overId);
-      const newOrder = arrayMove(timelineOrder, oldIndex, newIndex);
-      setTimelineOrderState(newOrder);
-      setTimelineOrder(newOrder);
-      setShowFeedback(false);
-    }
-  };
+    const dropZone = getElementDropZone();
+    const overInTimeline = timelineOrder.includes(overId || '');
+    const overInAvailable = availableCards.includes(overId || '');
 
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = active.id as string;
-    const overId = over.id as string;
-
-    const activeInAvailable = availableCards.includes(activeId);
-    const overInTimeline = timelineOrder.includes(overId);
-    const overIsDroppable = overId === 'timeline-drop';
-
-    if (activeInAvailable && (overInTimeline || overIsDroppable)) {
-      setAvailableCards((prev) => prev.filter((id) => id !== activeId));
-
+    if (activeInAvailable) {
       if (overInTimeline) {
-        const overIndex = timelineOrder.indexOf(overId);
-        setTimelineOrderState((prev) => {
-          const newOrder = [...prev];
-          newOrder.splice(overIndex, 0, activeId);
-          return newOrder;
-        });
-        setTimelineOrder([...timelineOrder.slice(0, timelineOrder.indexOf(overId)), activeId, ...timelineOrder.slice(timelineOrder.indexOf(overId))]);
-      } else {
-        setTimelineOrderState((prev) => [...prev, activeId]);
-        setTimelineOrder([...timelineOrder, activeId]);
+        const overIndex = timelineOrder.indexOf(overId!);
+        const newOrder = [...timelineOrder];
+        newOrder.splice(overIndex, 0, activeIdStr);
+        setTimelineOrderState(newOrder);
+        setTimelineOrder(newOrder);
+        setAvailableCards((prev) => prev.filter((id) => id !== activeIdStr));
+        setShowFeedback(false);
+      } else if (overInAvailable) {
+        const oldIndex = availableCards.indexOf(activeIdStr);
+        const newIndex = availableCards.indexOf(overId!);
+        setAvailableCards((prev) => arrayMove(prev, oldIndex, newIndex));
+      } else if (dropZone === 'timeline' || (!over && !dropZone)) {
+        setTimelineOrderState((prev) => [...prev, activeIdStr]);
+        setTimelineOrder([...timelineOrder, activeIdStr]);
+        setAvailableCards((prev) => prev.filter((id) => id !== activeIdStr));
+        setShowFeedback(false);
       }
-      setShowFeedback(false);
-    } else if (timelineOrder.includes(activeId) && overId === 'available-drop') {
-      setTimelineOrderState((prev) => prev.filter((id) => id !== activeId));
-      setAvailableCards((prev) => [...prev, activeId]);
-      setTimelineOrder(timelineOrder.filter((id) => id !== activeId));
-      setShowFeedback(false);
+    } else if (activeInTimeline) {
+      if (overInTimeline) {
+        const oldIndex = timelineOrder.indexOf(activeIdStr);
+        const newIndex = timelineOrder.indexOf(overId!);
+        const newOrder = arrayMove(timelineOrder, oldIndex, newIndex);
+        setTimelineOrderState(newOrder);
+        setTimelineOrder(newOrder);
+        setShowFeedback(false);
+      } else if (dropZone === 'available' || overInAvailable) {
+        setTimelineOrderState((prev) => prev.filter((id) => id !== activeIdStr));
+        setTimelineOrder(timelineOrder.filter((id) => id !== activeIdStr));
+        setAvailableCards((prev) => [...prev, activeIdStr]);
+        setShowFeedback(false);
+      } else if (dropZone === 'timeline') {
+        setTimelineOrderState((prev) => {
+          const without = prev.filter((id) => id !== activeIdStr);
+          return [...without, activeIdStr];
+        });
+        const without = timelineOrder.filter((id) => id !== activeIdStr);
+        const newOrder = [...without, activeIdStr];
+        setTimelineOrder(newOrder);
+        setShowFeedback(false);
+      }
     }
   };
 
@@ -147,7 +173,10 @@ export default function TimelinePage() {
   const handleReset = () => {
     if (eventId) {
       resetProgress(eventId);
-      setCurrentEvent(eventId);
+      setInitialized(false);
+      setTimeout(() => {
+        setCurrentEvent(eventId);
+      }, 0);
       setShowFeedback(false);
       setCorrectPositions([]);
     }
@@ -195,10 +224,9 @@ export default function TimelinePage() {
 
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
-            onDragOver={handleDragOver}
           >
             <div className="grid grid-cols-12 gap-8">
               <div className="col-span-4">
@@ -210,8 +238,8 @@ export default function TimelinePage() {
                     待排序卡片
                   </h3>
                   <div
-                    id="available-drop"
-                    data-id="available-drop"
+                    ref={availableDropRef}
+                    data-dropzone="available"
                     className={`
                       min-h-[600px] p-4 rounded-lg border-2 border-dashed transition-colors
                       ${availableCards.length === 0 ? 'border-gray-200 bg-gray-50' : 'border-gray-200'}
@@ -270,15 +298,15 @@ export default function TimelinePage() {
                   </div>
 
                   <div
-                    id="timeline-drop"
-                    data-id="timeline-drop"
+                    ref={timelineDropRef}
+                    data-dropzone="timeline"
                     className={`
                       relative min-h-[600px] p-6 rounded-lg border-2 border-dashed transition-colors
-                      ${timelineOrder.length === 0 ? 'border-primary-300 bg-primary-50/50' : 'border-gray-200'}
+                      ${timelineOrder.length === 0 ? 'border-primary-400 bg-primary-50/50' : 'border-gray-200'}
                     `}
                   >
                     {timelineOrder.length === 0 && (
-                      <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div className="text-center text-primary-500">
                           <Info className="w-10 h-10 mx-auto mb-2 opacity-50" />
                           <p>将左侧卡片拖拽到此处</p>

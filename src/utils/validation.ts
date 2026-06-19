@@ -23,9 +23,7 @@ export const isEdgeCorrect = (
   correctEdges: Edge[]
 ): boolean => {
   return correctEdges.some(
-    (correct) =>
-      (correct.source === edge.source && correct.target === edge.target) ||
-      (correct.source === edge.target && correct.target === edge.source)
+    (correct) => correct.source === edge.source && correct.target === edge.target
   );
 };
 
@@ -35,9 +33,7 @@ export const getEdgeCorrectness = (
 ): Edge => {
   const isCorrect = isEdgeCorrect(edge, correctEdges);
   const correctEdge = correctEdges.find(
-    (correct) =>
-      (correct.source === edge.source && correct.target === edge.target) ||
-      (correct.source === edge.target && correct.target === edge.source)
+    (correct) => correct.source === edge.source && correct.target === edge.target
   );
 
   return {

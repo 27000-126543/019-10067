@@ -11,9 +11,15 @@ export default function ResultPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const event = eventId ? getEventById(eventId) : undefined;
-  const { progress } = useGameStore();
+  const { progress, setCurrentEvent } = useGameStore();
   const [sortedNodes, setSortedNodes] = useState<PostNode[]>([]);
   const [activeTab, setActiveTab] = useState<'summary' | 'timeline' | 'network' | 'turning'>('summary');
+
+  useEffect(() => {
+    if (eventId) {
+      setCurrentEvent(eventId);
+    }
+  }, [eventId, setCurrentEvent]);
 
   useEffect(() => {
     if (event) {
@@ -22,8 +28,12 @@ export default function ResultPage() {
     }
   }, [event]);
 
-  if (!event || !progress) {
+  if (!event) {
     return <div className="p-8 text-center">事件不存在</div>;
+  }
+
+  if (!progress) {
+    return <div className="p-8 text-center text-primary-500">加载中...</div>;
   }
 
   const totalScore = Math.round(
@@ -244,9 +254,7 @@ export default function ResultPage() {
                       const source = event.nodes.find((n) => n.id === edge.source);
                       const target = event.nodes.find((n) => n.id === edge.target);
                       const studentHasEdge = progress.studentEdges.some(
-                        (e) =>
-                          (e.source === edge.source && e.target === edge.target) ||
-                          (e.source === edge.target && e.target === edge.source)
+                        (e) => e.source === edge.source && e.target === edge.target
                       );
 
                       return (

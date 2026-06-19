@@ -11,10 +11,16 @@ export default function TurningPointPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const event = eventId ? getEventById(eventId) : undefined;
-  const { progress, setTurningPoint, setTurningPointCorrect, completeGame } = useGameStore();
+  const { progress, setCurrentEvent, setTurningPoint, setTurningPointCorrect, completeGame } = useGameStore();
 
   const [showFeedback, setShowFeedback] = useState(false);
   const [sortedNodes, setSortedNodes] = useState<PostNode[]>([]);
+
+  useEffect(() => {
+    if (eventId) {
+      setCurrentEvent(eventId);
+    }
+  }, [eventId, setCurrentEvent]);
 
   useEffect(() => {
     if (event) {
@@ -23,8 +29,18 @@ export default function TurningPointPage() {
     }
   }, [event]);
 
-  if (!event || !progress) {
+  useEffect(() => {
+    if (progress && progress.selectedTurningPoint && (progress.turningPointCorrect || progress.completedAt)) {
+      setShowFeedback(true);
+    }
+  }, [progress]);
+
+  if (!event) {
     return <div className="p-8 text-center">事件不存在</div>;
+  }
+
+  if (!progress) {
+    return <div className="p-8 text-center text-primary-500">加载中...</div>;
   }
 
   const selectedId = progress.selectedTurningPoint;

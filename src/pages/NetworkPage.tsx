@@ -12,13 +12,19 @@ export default function NetworkPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const event = eventId ? getEventById(eventId) : undefined;
-  const { progress, addEdge, removeEdge, setNetworkScore } = useGameStore();
+  const { progress, setCurrentEvent, addEdge, removeEdge, setNetworkScore } = useGameStore();
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showNodeTypes, setShowNodeTypes] = useState(false);
   const [nodes, setNodes] = useState<PostNode[]>([]);
   const [edgesWithFeedback, setEdgesWithFeedback] = useState<Edge[]>([]);
+
+  useEffect(() => {
+    if (eventId) {
+      setCurrentEvent(eventId);
+    }
+  }, [eventId, setCurrentEvent]);
 
   useEffect(() => {
     if (event) {
@@ -33,15 +39,20 @@ export default function NetworkPage() {
       );
       setEdgesWithFeedback(edges);
 
-      if (showFeedback) {
+      if (progress.networkScore > 0 || showFeedback) {
         const score = calculateNetworkScore(edges, event.correctEdges);
         setNetworkScore(score);
+        setShowFeedback(true);
       }
     }
   }, [progress, event, showFeedback, setNetworkScore]);
 
-  if (!event || !progress) {
+  if (!event) {
     return <div className="p-8 text-center">事件不存在</div>;
+  }
+
+  if (!progress) {
+    return <div className="p-8 text-center text-primary-500">加载中...</div>;
   }
 
   const handleSelectNode = (nodeId: string) => {
@@ -50,9 +61,7 @@ export default function NetworkPage() {
 
   const handleConnect = (sourceId: string, targetId: string) => {
     const existingEdge = progress.studentEdges.find(
-      (e) =>
-        (e.source === sourceId && e.target === targetId) ||
-        (e.source === targetId && e.target === sourceId)
+      (e) => e.source === sourceId && e.target === targetId
     );
 
     if (existingEdge) {
