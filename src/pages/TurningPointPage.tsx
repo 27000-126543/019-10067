@@ -30,8 +30,13 @@ export default function TurningPointPage() {
   }, [event]);
 
   useEffect(() => {
-    if (progress && progress.selectedTurningPoint && (progress.turningPointCorrect || progress.completedAt)) {
-      setShowFeedback(true);
+    if (progress) {
+      const hasSubmitted = progress.selectedTurningPoint !== null && (
+        progress.turningPointCorrect === true || progress.turningPointCorrect === false || progress.completedAt
+      );
+      if (hasSubmitted) {
+        setShowFeedback(true);
+      }
     }
   }, [progress]);
 
@@ -57,6 +62,12 @@ export default function TurningPointPage() {
     const correct = selectedId === event.turningPointId;
     setTurningPointCorrect(correct);
     setShowFeedback(true);
+  };
+
+  const handleResetChoice = () => {
+    setShowFeedback(false);
+    setTurningPoint(null);
+    setTurningPointCorrect(false);
   };
 
   const handleComplete = () => {
@@ -165,7 +176,7 @@ export default function TurningPointPage() {
                                 </div>
                               </div>
                               {isSelected && (
-                                <Target className="w-5 h-5 text-gold-500" />
+                                <Target className={`w-5 h-5 ${showFeedback && !isCorrectNode ? 'text-red-500' : showFeedback && isCorrectNode ? 'text-green-500' : 'text-gold-500'}`} />
                               )}
                             </div>
 
@@ -186,6 +197,11 @@ export default function TurningPointPage() {
                               <span className="text-xs text-green-600 font-medium flex items-center gap-1">
                                 <Check className="w-3 h-3" />
                                 正确拐点
+                              </span>
+                            )}
+                            {showFeedback && isSelected && !isCorrectNode && (
+                              <span className="text-xs text-red-600 font-medium flex items-center gap-1">
+                                你的选择
                               </span>
                             )}
                           </div>
@@ -269,7 +285,11 @@ export default function TurningPointPage() {
 
           <div className="flex items-center justify-between mt-8">
             <div className="text-sm text-primary-500">
-              {selectedId ? '已选择拐点：' + event.nodes.find((n) => n.id === selectedId)?.author : '请点击选择拐点'}
+              {selectedId
+                ? (showFeedback
+                    ? `已提交答案：${event.nodes.find((n) => n.id === selectedId)?.author}${isCorrect ? '（正确）' : '（错误）'}`
+                    : `已选择拐点：${event.nodes.find((n) => n.id === selectedId)?.author}`)
+                : '请点击选择拐点'}
             </div>
 
             <div className="flex items-center gap-4">
@@ -289,11 +309,7 @@ export default function TurningPointPage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => {
-                    setShowFeedback(false);
-                    setTurningPoint(null);
-                    setTurningPointCorrect(false);
-                  }}
+                  onClick={handleResetChoice}
                   className="px-6 py-3 rounded-xl font-semibold border-2 border-primary-300 text-primary-700 hover:bg-primary-50 transition-colors"
                 >
                   重新选择

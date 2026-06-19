@@ -99,10 +99,11 @@ export default function TimelinePage() {
     const activeInTimeline = timelineOrder.includes(activeIdStr);
     const activeInAvailable = availableCards.includes(activeIdStr);
 
+    if (!activeInTimeline && !activeInAvailable) return;
+
     const overId = over?.id as string | undefined;
 
     const getElementDropZone = () => {
-      if (!over) return null;
       const activator = event.activatorEvent as PointerEvent | undefined;
       if (!activator) return null;
       const el = document.elementFromPoint(activator.clientX, activator.clientY);
@@ -113,8 +114,8 @@ export default function TimelinePage() {
     };
 
     const dropZone = getElementDropZone();
-    const overInTimeline = timelineOrder.includes(overId || '');
-    const overInAvailable = availableCards.includes(overId || '');
+    const overInTimeline = overId ? timelineOrder.includes(overId) : false;
+    const overInAvailable = overId ? availableCards.includes(overId) : false;
 
     if (activeInAvailable) {
       if (overInTimeline) {
@@ -129,32 +130,31 @@ export default function TimelinePage() {
         const oldIndex = availableCards.indexOf(activeIdStr);
         const newIndex = availableCards.indexOf(overId!);
         setAvailableCards((prev) => arrayMove(prev, oldIndex, newIndex));
-      } else if (dropZone === 'timeline' || (!over && !dropZone)) {
-        setTimelineOrderState((prev) => [...prev, activeIdStr]);
-        setTimelineOrder([...timelineOrder, activeIdStr]);
+      } else if (dropZone === 'timeline') {
+        const newOrder = [...timelineOrder, activeIdStr];
+        setTimelineOrderState(newOrder);
+        setTimelineOrder(newOrder);
         setAvailableCards((prev) => prev.filter((id) => id !== activeIdStr));
         setShowFeedback(false);
       }
     } else if (activeInTimeline) {
-      if (overInTimeline) {
+      if (overInTimeline && overId !== activeIdStr) {
         const oldIndex = timelineOrder.indexOf(activeIdStr);
         const newIndex = timelineOrder.indexOf(overId!);
         const newOrder = arrayMove(timelineOrder, oldIndex, newIndex);
         setTimelineOrderState(newOrder);
         setTimelineOrder(newOrder);
         setShowFeedback(false);
-      } else if (dropZone === 'available' || overInAvailable) {
-        setTimelineOrderState((prev) => prev.filter((id) => id !== activeIdStr));
-        setTimelineOrder(timelineOrder.filter((id) => id !== activeIdStr));
+      } else if (overInAvailable || dropZone === 'available') {
+        const newOrder = timelineOrder.filter((id) => id !== activeIdStr);
+        setTimelineOrderState(newOrder);
+        setTimelineOrder(newOrder);
         setAvailableCards((prev) => [...prev, activeIdStr]);
         setShowFeedback(false);
       } else if (dropZone === 'timeline') {
-        setTimelineOrderState((prev) => {
-          const without = prev.filter((id) => id !== activeIdStr);
-          return [...without, activeIdStr];
-        });
         const without = timelineOrder.filter((id) => id !== activeIdStr);
         const newOrder = [...without, activeIdStr];
+        setTimelineOrderState(newOrder);
         setTimelineOrder(newOrder);
         setShowFeedback(false);
       }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, RotateCcw, Eye, EyeOff, Info, Trash2 } from 'lucide-react';
 import StepIndicator from '@/components/layout/StepIndicator';
@@ -34,18 +34,21 @@ export default function NetworkPage() {
 
   useEffect(() => {
     if (progress && event) {
+      if (progress.networkScore > 0 && !showFeedback) {
+        setShowFeedback(true);
+        setShowNodeTypes(true);
+      }
+    }
+  }, [progress]);
+
+  useEffect(() => {
+    if (progress && event) {
       const edges = progress.studentEdges.map((edge) =>
         getEdgeCorrectness(edge, event.correctEdges)
       );
       setEdgesWithFeedback(edges);
-
-      if (progress.networkScore > 0 || showFeedback) {
-        const score = calculateNetworkScore(edges, event.correctEdges);
-        setNetworkScore(score);
-        setShowFeedback(true);
-      }
     }
-  }, [progress, event, showFeedback, setNetworkScore]);
+  }, [progress?.studentEdges, event]);
 
   if (!event) {
     return <div className="p-8 text-center">事件不存在</div>;
@@ -76,12 +79,18 @@ export default function NetworkPage() {
     };
 
     addEdge(newEdge);
-    setShowFeedback(false);
+    if (showFeedback) {
+      setShowFeedback(false);
+      setNetworkScore(0);
+    }
   };
 
   const handleRemoveEdge = (edgeId: string) => {
     removeEdge(edgeId);
-    setShowFeedback(false);
+    if (showFeedback) {
+      setShowFeedback(false);
+      setNetworkScore(0);
+    }
   };
 
   const handleNodePositionChange = (nodeId: string, position: { x: number; y: number }) => {
@@ -91,22 +100,30 @@ export default function NetworkPage() {
   };
 
   const handleCheck = () => {
-    setShowFeedback(true);
-    setShowNodeTypes(true);
     const score = calculateNetworkScore(edgesWithFeedback, event.correctEdges);
     setNetworkScore(score);
+    setShowFeedback(true);
+    setShowNodeTypes(true);
   };
 
   const handleReset = () => {
-    progress.studentEdges.forEach((edge) => removeEdge(edge.id));
+    const edgeIds = [...progress.studentEdges.map((e) => e.id)];
+    edgeIds.forEach((edgeId) => removeEdge(edgeId));
     setShowFeedback(false);
     setShowNodeTypes(false);
     setSelectedNode(null);
+    setNetworkScore(0);
   };
 
-  const score = showFeedback
-    ? calculateNetworkScore(edgesWithFeedback, event.correctEdges)
-    : 0;
+  const handleContinueEdit = () => {
+    setShowFeedback(false);
+    setNetworkScore(0);
+  };
+
+  const score = useMemo(() => {
+    if (!showFeedback) return 0;
+    return calculateNetworkScore(edgesWithFeedback, event.correctEdges);
+  }, [showFeedback, edgesWithFeedback, event]);
 
   const correctCount = edgesWithFeedback.filter((e) => e.isCorrect).length;
   const totalCorrect = event.correctEdges.length;
@@ -296,7 +313,7 @@ export default function NetworkPage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setShowFeedback(false)}
+                  onClick={handleContinueEdit}
                   className="px-6 py-3 rounded-xl font-semibold border-2 border-primary-300 text-primary-700 hover:bg-primary-50 transition-colors"
                 >
                   继续调整
