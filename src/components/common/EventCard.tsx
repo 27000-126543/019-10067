@@ -15,21 +15,13 @@ const difficultyConfig: Record<DifficultyType, { label: string; color: string; b
   hard: { label: '困难', color: 'text-red-700', bg: 'bg-red-100' },
 };
 
-const stepLabels = [
-  { step: 'timeline', label: '时间线排序', path: '/student/timeline/' },
-  { step: 'network', label: '传播网连线', path: '/student/network/' },
-  { step: 'turning', label: '拐点标注', path: '/student/turning/' },
-  { step: 'result', label: '结果解析', path: '/student/result/' },
-];
-
 export default function EventCard({ event, progress }: EventCardProps) {
   const diff = difficultyConfig[event.difficulty];
   const platforms = [...new Set(event.nodes.map((n) => n.platform))];
 
-  const { currentStep, stepLabel, nextPath, progressPercent } = useMemo(() => {
+  const { stepLabel, nextPath, progressPercent } = useMemo(() => {
     if (!progress) {
       return {
-        currentStep: 0,
         stepLabel: '未开始',
         nextPath: `/student/timeline/${event.id}`,
         progressPercent: 0,
@@ -38,42 +30,52 @@ export default function EventCard({ event, progress }: EventCardProps) {
 
     if (progress.completedAt) {
       return {
-        currentStep: 4,
         stepLabel: '已完成',
         nextPath: `/student/result/${event.id}`,
         progressPercent: 100,
       };
     }
 
-    if (progress.selectedTurningPoint && (progress.turningPointCorrect || progress.networkScore > 0)) {
+    const hasTimelineData =
+      progress.timelineOrder.length > 0 || progress.timelineChecked;
+    const hasNetworkData =
+      progress.studentEdges.length > 0 || progress.networkChecked;
+    const hasTurningData =
+      progress.selectedTurningPoint !== null || progress.turningPointSubmitted;
+
+    if (progress.turningPointSubmitted) {
       return {
-        currentStep: 3,
-        stepLabel: stepLabels[2].label,
+        stepLabel: '判拐点（已提交）',
         nextPath: `/student/turning/${event.id}`,
         progressPercent: 75,
       };
     }
 
-    if (progress.studentEdges.length > 0 || progress.networkScore > 0) {
+    if (hasTurningData) {
       return {
-        currentStep: 2,
-        stepLabel: stepLabels[1].label,
+        stepLabel: '判拐点（待提交）',
+        nextPath: `/student/turning/${event.id}`,
+        progressPercent: 75,
+      };
+    }
+
+    if (hasNetworkData) {
+      return {
+        stepLabel: progress.networkChecked ? '传播网（已检查）' : '传播网连线',
         nextPath: `/student/network/${event.id}`,
         progressPercent: 50,
       };
     }
 
-    if (progress.timelineOrder.length > 0 || progress.timelineScore > 0) {
+    if (hasTimelineData) {
       return {
-        currentStep: 1,
-        stepLabel: stepLabels[0].label,
+        stepLabel: progress.timelineChecked ? '时间线（已检查）' : '时间线排序',
         nextPath: `/student/timeline/${event.id}`,
         progressPercent: 25,
       };
     }
 
     return {
-      currentStep: 0,
       stepLabel: '未开始',
       nextPath: `/student/timeline/${event.id}`,
       progressPercent: 0,
@@ -94,7 +96,7 @@ export default function EventCard({ event, progress }: EventCardProps) {
           <div className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${diff.bg} ${diff.color}`}>
             难度：{diff.label}
           </div>
-          {currentStep > 0 && (
+          {progressPercent > 0 && (
             <div className="bg-gold-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
               {progressPercent === 100 ? (
                 <>

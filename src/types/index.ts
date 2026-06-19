@@ -49,9 +49,12 @@ export interface StudentProgress {
   eventId: string;
   timelineOrder: string[];
   timelineScore: number;
+  timelineChecked: boolean;
   studentEdges: Edge[];
   networkScore: number;
+  networkChecked: boolean;
   selectedTurningPoint: string | null;
+  turningPointSubmitted: boolean;
   turningPointCorrect: boolean;
   completedAt: number | null;
 }

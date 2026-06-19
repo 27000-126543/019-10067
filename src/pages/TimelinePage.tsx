@@ -27,8 +27,13 @@ export default function TimelinePage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const event = eventId ? getEventById(eventId) : undefined;
-  const { progress, setCurrentEvent, setTimelineOrder, setTimelineScore, resetProgress } =
-    useGameStore();
+  const {
+    progress,
+    setCurrentEvent,
+    setTimelineOrder,
+    setTimelineCheckedAndScore,
+    resetProgress,
+  } = useGameStore();
 
   const [availableCards, setAvailableCards] = useState<string[]>([]);
   const [timelineOrder, setTimelineOrderState] = useState<string[]>([]);
@@ -65,7 +70,7 @@ export default function TimelinePage() {
           .map((n) => n.id)
           .filter((id) => !progress.timelineOrder.includes(id));
         setAvailableCards(remaining);
-        if (progress.timelineScore > 0 && progress.timelineOrder.length === event.nodes.length) {
+        if (progress.timelineChecked && progress.timelineOrder.length === event.nodes.length) {
           const result = validateTimelineOrder(progress.timelineOrder, event.correctOrder);
           setCorrectPositions(result.correctPositions);
           setShowFeedback(true);
@@ -102,18 +107,35 @@ export default function TimelinePage() {
     if (!activeInTimeline && !activeInAvailable) return;
 
     const overId = over?.id as string | undefined;
+    const activator = event.activatorEvent as PointerEvent | undefined;
 
-    const getElementDropZone = () => {
-      const activator = event.activatorEvent as PointerEvent | undefined;
-      if (!activator) return null;
-      const el = document.elementFromPoint(activator.clientX, activator.clientY);
-      if (!el) return null;
-      if (el.closest('[data-dropzone="timeline"]')) return 'timeline';
-      if (el.closest('[data-dropzone="available"]')) return 'available';
-      return null;
+    const isPointInRect = (rect: DOMRect, x: number, y: number) => {
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
     };
 
-    const dropZone = getElementDropZone();
+    const getDropZoneFromPoint = () => {
+      if (!activator) return { zone: null as null | 'timeline' | 'available', yInZone: 0 };
+      const timelineEl = timelineDropRef.current;
+      const availableEl = availableDropRef.current;
+      const x = activator.clientX;
+      const y = activator.clientY;
+      if (timelineEl) {
+        const rect = timelineEl.getBoundingClientRect();
+        if (isPointInRect(rect, x, y)) {
+          return { zone: 'timeline' as const, yInZone: y - rect.top };
+        }
+      }
+      if (availableEl) {
+        const rect = availableEl.getBoundingClientRect();
+        if (isPointInRect(rect, x, y)) {
+          return { zone: 'available' as const, yInZone: y - rect.top };
+        }
+      }
+      return { zone: null, yInZone: 0 };
+    };
+
+    const { zone: dropZone } = getDropZoneFromPoint();
+
     const overInTimeline = overId ? timelineOrder.includes(overId) : false;
     const overInAvailable = overId ? availableCards.includes(overId) : false;
 
@@ -166,8 +188,13 @@ export default function TimelinePage() {
 
     const result = validateTimelineOrder(timelineOrder, event.correctOrder);
     setCorrectPositions(result.correctPositions);
-    setTimelineScore(result.score);
+    setTimelineCheckedAndScore(true, result.score);
     setShowFeedback(true);
+  };
+
+  const handleContinueAdjust = () => {
+    setTimelineCheckedAndScore(false, 0);
+    setShowFeedback(false);
   };
 
   const handleReset = () => {
@@ -390,7 +417,7 @@ export default function TimelinePage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setShowFeedback(false)}
+                  onClick={handleContinueAdjust}
                   className="px-6 py-3 rounded-xl font-semibold border-2 border-primary-300 text-primary-700 hover:bg-primary-50 transition-colors"
                 >
                   继续调整

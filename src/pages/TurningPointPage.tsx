@@ -11,7 +11,14 @@ export default function TurningPointPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const event = eventId ? getEventById(eventId) : undefined;
-  const { progress, setCurrentEvent, setTurningPoint, setTurningPointCorrect, completeGame } = useGameStore();
+  const {
+    progress,
+    setCurrentEvent,
+    setTurningPoint,
+    setTurningPointSubmittedAndCorrect,
+    resetTurningPoint,
+    completeGame,
+  } = useGameStore();
 
   const [showFeedback, setShowFeedback] = useState(false);
   const [sortedNodes, setSortedNodes] = useState<PostNode[]>([]);
@@ -30,15 +37,10 @@ export default function TurningPointPage() {
   }, [event]);
 
   useEffect(() => {
-    if (progress) {
-      const hasSubmitted = progress.selectedTurningPoint !== null && (
-        progress.turningPointCorrect === true || progress.turningPointCorrect === false || progress.completedAt
-      );
-      if (hasSubmitted) {
-        setShowFeedback(true);
-      }
+    if (progress && progress.turningPointSubmitted) {
+      setShowFeedback(true);
     }
-  }, [progress]);
+  }, [progress?.turningPointSubmitted]);
 
   if (!event) {
     return <div className="p-8 text-center">事件不存在</div>;
@@ -60,14 +62,13 @@ export default function TurningPointPage() {
   const handleCheck = () => {
     if (!selectedId) return;
     const correct = selectedId === event.turningPointId;
-    setTurningPointCorrect(correct);
+    setTurningPointSubmittedAndCorrect(true, correct);
     setShowFeedback(true);
   };
 
   const handleResetChoice = () => {
+    resetTurningPoint();
     setShowFeedback(false);
-    setTurningPoint(null);
-    setTurningPointCorrect(false);
   };
 
   const handleComplete = () => {
@@ -288,7 +289,7 @@ export default function TurningPointPage() {
               {selectedId
                 ? (showFeedback
                     ? `已提交答案：${event.nodes.find((n) => n.id === selectedId)?.author}${isCorrect ? '（正确）' : '（错误）'}`
-                    : `已选择拐点：${event.nodes.find((n) => n.id === selectedId)?.author}`)
+                    : `已选择拐点：${event.nodes.find((n) => n.id === selectedId)?.author}（待提交）`)
                 : '请点击选择拐点'}
             </div>
 

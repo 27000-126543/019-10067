@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, RotateCcw, Eye, EyeOff, Info, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCcw, Eye, EyeOff, Trash2 } from 'lucide-react';
 import StepIndicator from '@/components/layout/StepIndicator';
 import NetworkCanvas from '@/components/network/NetworkCanvas';
 import { getEventById } from '@/data';
@@ -12,7 +12,13 @@ export default function NetworkPage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const event = eventId ? getEventById(eventId) : undefined;
-  const { progress, setCurrentEvent, addEdge, removeEdge, setNetworkScore } = useGameStore();
+  const {
+    progress,
+    setCurrentEvent,
+    addEdge,
+    removeEdge,
+    setNetworkCheckedAndScore,
+  } = useGameStore();
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -33,13 +39,11 @@ export default function NetworkPage() {
   }, [event]);
 
   useEffect(() => {
-    if (progress && event) {
-      if (progress.networkScore > 0 && !showFeedback) {
-        setShowFeedback(true);
-        setShowNodeTypes(true);
-      }
+    if (progress?.networkChecked) {
+      setShowFeedback(true);
+      setShowNodeTypes(true);
     }
-  }, [progress]);
+  }, [progress?.networkChecked]);
 
   useEffect(() => {
     if (progress && event) {
@@ -79,18 +83,13 @@ export default function NetworkPage() {
     };
 
     addEdge(newEdge);
-    if (showFeedback) {
-      setShowFeedback(false);
-      setNetworkScore(0);
-    }
+    setShowFeedback(false);
+    setSelectedNode(null);
   };
 
   const handleRemoveEdge = (edgeId: string) => {
     removeEdge(edgeId);
-    if (showFeedback) {
-      setShowFeedback(false);
-      setNetworkScore(0);
-    }
+    setShowFeedback(false);
   };
 
   const handleNodePositionChange = (nodeId: string, position: { x: number; y: number }) => {
@@ -101,7 +100,7 @@ export default function NetworkPage() {
 
   const handleCheck = () => {
     const score = calculateNetworkScore(edgesWithFeedback, event.correctEdges);
-    setNetworkScore(score);
+    setNetworkCheckedAndScore(true, score);
     setShowFeedback(true);
     setShowNodeTypes(true);
   };
@@ -112,18 +111,17 @@ export default function NetworkPage() {
     setShowFeedback(false);
     setShowNodeTypes(false);
     setSelectedNode(null);
-    setNetworkScore(0);
   };
 
   const handleContinueEdit = () => {
+    setNetworkCheckedAndScore(false, 0);
     setShowFeedback(false);
-    setNetworkScore(0);
   };
 
   const score = useMemo(() => {
-    if (!showFeedback) return 0;
+    if (!showFeedback) return progress.networkScore || 0;
     return calculateNetworkScore(edgesWithFeedback, event.correctEdges);
-  }, [showFeedback, edgesWithFeedback, event]);
+  }, [showFeedback, edgesWithFeedback, event, progress.networkScore]);
 
   const correctCount = edgesWithFeedback.filter((e) => e.isCorrect).length;
   const totalCorrect = event.correctEdges.length;
